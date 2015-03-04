@@ -2,15 +2,15 @@
   <iframe src="/niku/return.html" name="myFrame" width="100%" height="700">
   </iframe>
   <script>
-        /* Adjust These two attributes in accordance with your specific use case for Hierarchical Views */
-        var pageID = 'gwbs_hiev_wbs'; /* Page ID (tab) where this portlet will reside */
-	var hierID = 'hiev_gwbs_org'; /* Hierarchical View ID */
+        // Adjust These two attributes in accordance with your specific use case for Hierarchical Views
+        var pageID = 'gwbs_hiev_wbs'; // Page ID (tab) where this portlet will reside
+	var hierID = 'hiev_gwbs_org'; // Hierarchical View ID
  	var url = document.URL;
- 	var pageLocation = url.indexOf(pageID); /* If not found (-1) this is a popup */
+ 	var pageLocation = url.indexOf(pageID); //If not found (-1) this is a popup
     	if (pageLocation <= 0)
         {
-          /* Popup */
-          var innerUrl = document.getElementById('ppm_mnp').innerHTML; /* This is the Div that contains the Modal page */
+          //Popup
+          var innerUrl = document.getElementById('ppm_mnp').innerHTML; // this is the Div that contains the Modal page
           pageID = 'action=' + pageID;
           pageLocation = innerUrl.indexOf(pageID);
           pageLocation = pageLocation + pageID.length;
@@ -20,7 +20,7 @@
         }
     	else
         {
-          /* Not a Popup */
+          //Not a Popup
           pageLocation = pageLocation + pageID.length; 
  	  var idLocation = url.indexOf('id=',pageLocation)+3;
 	  var end = idLocation + 7;
