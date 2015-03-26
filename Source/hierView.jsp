@@ -476,6 +476,7 @@ catch( Exception e )
 						if (debugLevel > 1) window.alert("drawTreeHeatMap");
 						tree.draw(data, 
 						{
+							height: 570,
 							maxDepth: vMaxDepth,
 							fontFamily: vFontFamily,
 							fontSize: vFontSize,
@@ -591,6 +592,7 @@ catch( Exception e )
 						if (debugLevel > 1) window.alert("drawDiagram");
 
 						tree.draw(data, {
+										height: 600,
 										sankey: { 
 											node: { 
 												color: {
@@ -631,7 +633,7 @@ catch( Exception e )
 				</th></tr>
 			  <tr>
 				<td align="left">
-					<div style="width:100%; height:570px">				
+					<div style="width:100%; height:100%">				
 						<div id="map_canvas" style="width:100%; height:100%"></div>
 					<div>			
 				  </td>
