@@ -526,6 +526,8 @@ catch( Exception e )
 						for (i = 1; i < dataArray.length; i++)
 						{
 							childId = findId(i-1,dataArray[i][0]);
+							if (debugLevel > 2) window.alert("Child " + dataArray[i][0] + " gets Id " + childId);
+							
 							if (i==1)
 							{
 								parent = -1;
@@ -534,6 +536,8 @@ catch( Exception e )
 							{
 								parent = findId(i-1,dataArray[i][2]);
 							}
+							 if (debugLevel > 3) window.alert("Parent " + dataArray[i][2] + " has Id " + parent);
+							 
 							childLabel = dataArray[i][1];
 							sizeWord = dataArray[i][3];
 							colorWord = dataArray[i][4];
