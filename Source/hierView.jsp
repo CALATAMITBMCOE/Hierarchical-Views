@@ -274,7 +274,9 @@ catch( Exception e )
 		<script type="text/javascript">		
 			var addlArray = [];
 			var dataArray = [];
-			var sequentialIdArray = [];
+
+			var sequentialChildArray = [];
+			var sequentialParentArray = [];
 			var vDrillTarget = "";
 			var debugLevel = 0;
 
@@ -288,17 +290,38 @@ catch( Exception e )
 						'<br>' + '<b><a target="' + vDrillTarget + '" href="' + itemLink + '">' + dataArray[row+1][0] + '</a></b><br></span></div>';
 			}
 
-			function findId(seq, searchId)
-            {
-				for (x = 0; x<sequentialIdArray.length; x++)
-                {
-					if (sequentialIdArray[x] == searchId)
-                    {
+
+			function addSequentialId(childId, parentId)
+			{
+				var idFound = false;
+				for (x=0; x<sequentialChildArray.length; x++) {
+					if ((sequentialChildArray[x] == childId) 
+						&& (sequentialParentArray[x] == parentId)) {
+						if (debugLevel > 2) window.alert("Node " + childId + " for parent " + parentId + " found at position " + x + ". Not ADDED");
+						idFound = true;
+					}
+				}
+				if (idFound == false) {
+					if (debugLevel > 2) window.alert("Node " + childId + " for parent " + parentId + " not found. Adding at position " + x);
+					sequentialChildArray.push([childId]);
+					sequentialParentArray.push([parentId]);
+				}
+			}
+
+			function findId(childId, parentId)
+            		{
+
+				for (x = 0; x<sequentialChildArray.length; x++)
+		                {
+					if (((sequentialChildArray[x] == childId) && (sequentialParentArray[x] == parentId)) ||
+					    ((sequentialChildArray[x] == childId) && (parentId == -1)))
+                    			{
 						return x;
-                    }
-                }
-                sequentialIdArray.push([searchId]);
-                return seq;
+                    			}
+                		}
+
+
+                		return -1;
 			}
 
 			function drawChart() 
@@ -402,7 +425,7 @@ catch( Exception e )
 						}
 						
 					%>
-							
+
 						itemName = "<%= nodeNameList.get(ii)%>";
 						itemIntl = "<%= nodeIdList.get(ii)%>";
 						parentId = "<%= nodeParentIdList.get(ii)%>";
@@ -523,29 +546,36 @@ catch( Exception e )
 						var sizeWord = 0;
 						var colorWord = "";
 						var parent = -1;
-						for (i = 1; i < dataArray.length; i++)
+						if (debugLevel > 2) window.alert("Creating Sequential ID Array");
+						for (ind = 1; ind < dataArray.length; ind++){
+							if (debugLevel > 2) window.alert("Index: " + ind + " is Node " + dataArray[ind][0]);
+							addSequentialId(dataArray[ind][0], dataArray[ind][2]);
+						}
+
+						for (ind = 1; ind < dataArray.length; ind++)
 						{
-							childId = findId(i-1,dataArray[i][0]);
-							if (debugLevel > 2) window.alert("Child " + dataArray[i][0] + " gets Id " + childId);
-							
-							if (i==1)
+							childId = findId(dataArray[ind][0], dataArray[ind][2]);
+							if (debugLevel > 2) window.alert("Index: "+ ind + " - Child " + dataArray[ind][0] + " found Id " + childId);
+
+							if (ind==1)
 							{
 								parent = -1;
 							}
 							else
 							{
-								parent = findId(i-1,dataArray[i][2]);
+								parent = findId(dataArray[ind][2],-1);
 							}
-							 if (debugLevel > 3) window.alert("Parent " + dataArray[i][2] + " has Id " + parent);
-							 
-							childLabel = dataArray[i][1];
-							sizeWord = dataArray[i][3];
-							colorWord = dataArray[i][4];
+							if (debugLevel > 3) window.alert("Parent " + dataArray[ind][2] + " has Id " + parent);
+
+							childLabel = dataArray[ind][1];
+							sizeWord = dataArray[ind][3];
+							colorWord = dataArray[ind][4];
+							if (debugLevel > 2) window.alert("Will Add Row to Data Array: " + childId + ", " + childLabel + ", " + parent + ", " + colorWord);
 							data.addRow([childId, childLabel, parent, 1, colorWord]);
 						}
 			
 						if (debugLevel > 1) window.alert("dataTable is Ready");
-						
+
 						tree = new google.visualization.WordTree(document.getElementById('map_canvas'));
 						if (debugLevel > 1) window.alert("drawWordTree "+vFontFamily+vFontSize);
 
