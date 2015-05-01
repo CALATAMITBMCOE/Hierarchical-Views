@@ -267,14 +267,10 @@ catch( Exception e )
 			a.orgDarkLink:hover {color:#000000;text-decoration:underline;}
 		</style>
 		<title>Hierarchical View</title>
-		<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['treemap']}]}"></script>
-		<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['orgchart']}]}"></script>
-		<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1.1','packages':['wordtree']}]}"></script>
-		<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1.1','packages':['sankey']}]}"></script>
+		<script type="text/javascript" src='https://www.google.com/jsapi?autoload={"modules":[{"name":"visualization","version":"1","packages":["sankey","wordtree","treemap","orgchart"]}]}'></script>
 		<script type="text/javascript">		
 			var addlArray = [];
 			var dataArray = [];
-
 			var sequentialChildArray = [];
 			var sequentialParentArray = [];
 			var vDrillTarget = "";
@@ -289,7 +285,6 @@ catch( Exception e )
 						'<span style="font-family:Calibri">' + addlInfo +
 						'<br>' + '<b><a target="' + vDrillTarget + '" href="' + itemLink + '">' + dataArray[row+1][0] + '</a></b><br></span></div>';
 			}
-
 
 			function addSequentialId(childId, parentId)
 			{
@@ -310,7 +305,6 @@ catch( Exception e )
 
 			function findId(childId, parentId)
             		{
-
 				for (x = 0; x<sequentialChildArray.length; x++)
 		                {
 					if (((sequentialChildArray[x] == childId) && (sequentialParentArray[x] == parentId)) ||
@@ -319,8 +313,6 @@ catch( Exception e )
 						return x;
                     			}
                 		}
-
-
                 		return -1;
 			}
 
