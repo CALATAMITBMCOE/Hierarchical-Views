@@ -649,7 +649,7 @@ catch( Exception e )
 			}
 		</script>
 	</head>
-	<body onload="drawChart()" onunload="GUnload()">
+	<body onload="drawChart()">
 		<form name="maps.page" method="post" action="hierView.jsp">
 			<table border="0" cellspacing="1" cellpadding="0" class="tableGridList" width="100%">
 				<tr height="30px"><th align="right" >
