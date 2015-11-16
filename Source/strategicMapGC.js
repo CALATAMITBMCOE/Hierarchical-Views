@@ -1,9 +1,17 @@
 <html>
 	<head>
+		<style>
+			a.orgLightLink:link {color:#ffffff;text-decoration:none;}
+			a.orgLightLink:visited {color:#ffffff;text-decoration:none;}
+			a.orgLightLink:hover {color:#ffffff;text-decoration:underline;}
+			a.orgDarkLink:link {color:#000000;text-decoration:none;}
+			a.orgDarkLink:visited {color:#000000;text-decoration:none;}
+			a.orgDarkLink:hover {color:#000000;text-decoration:underline;}
+		</style>
 		<title>Hierarchical View</title>
-		<script src="/niku/app?action=dms.viewFile&RhXm0r7tSeUqEr=true&fileId=5075906&fileName=wsdl_wrapper.js"/>
-		<script src="/niku/app?action=dms.viewFile&RhXm0r7tSeUqEr=true&fileId=5075912&fileName=hierView.js"/>
-		<script src="/niku/app?action=dms.viewFile&RhXm0r7tSeUqEr=true&fileId=5075909&fileName=google_jsapi.js"/>
+		<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+		<script src="http://ppmlatam183.ca.com/niku/app?action=dms.viewFile&RhXm0r7tSeUqEr=true&fileId=5074420&fileName=wsdl_wrapper.js"/>
+		<script src="http://ppmlatam183.ca.com/niku/app?action=dms.viewFile&RhXm0r7tSeUqEr=true&fileId=5074417&fileName=hierView.js"/>
 		
 		<script language="javascript">
 			function drawChart() {
