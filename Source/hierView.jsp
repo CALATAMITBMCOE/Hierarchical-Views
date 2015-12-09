@@ -491,7 +491,7 @@ catch( Exception e )
 						if (debugLevel > 1) window.alert("drawTreeHeatMap");
 						tree.draw(data, 
 						{
-							height: 570,
+							width:1024, height: 570,
 							maxDepth: vMaxDepth,
 							fontFamily: vFontFamily,
 							fontSize: vFontSize,

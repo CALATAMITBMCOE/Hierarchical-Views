@@ -1,31 +1,82 @@
 <html>
+	<style>
+			.orgChartLink:link {text-decoration:none;}
+			.orgChartLink:visited {text-decoration:none;}
+			.orgChartLink:hover {text-decoration:underline;}
+			#print {
+				width:20;
+				height:20;
+				align:right;
+				border:0;
+			}
+	</style>
 	<head>
 	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
 	<script language="javascript">
-			function SOAPClient() {}
-function getCookie(cname) {
-    var name = cname + "=";
-    var ca = document.cookie.split(';');
-    for(var i=0; i<ca.length; i++) {
-        var c = ca[i];
-        while (c.charAt(0)==' ') c = c.substring(1);
-        if (c.indexOf(name) == 0) return c.substring(name.length,c.length);
-    }
-    return "";
-}
+			
+			/* 	debugMode=1 -> Init
+				debugMode=2 -> SoapClient
+				debugMode=3 -> View Query
+				debugMode=4 -> Node Query
+				debugMode=5 -> L3 Query Result 
+				debugMode=6 -> DD Query Result */
 
-		SOAPClient.invoke = function(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback)
+			var debugMode = 0;
+			var viewCode = "";
+			var urlPortlet = window.document.URL;
+			var viewLocation = urlPortlet.indexOf('\&viewID=');
+			var debugLocation = urlPortlet.indexOf('\&debugMode=');
+			if (viewLocation > debugLocation) {
+				if (debugLocation>=0) {
+					debugMode = urlPortlet.substring(debugLocation+11,viewLocation);
+				} 
+				viewCode = urlPortlet.substring(viewLocation+8);
+			} else {
+				viewCode = urlPortlet.substring(viewLocation+8,debugLocation);
+				debugMode = urlPortlet.substring(debugLocation+11);
+			}
+
+			var drillPage = "";
+			var nodeName = [];
+			var nodeId = [];
+			var nodeParentName = [];
+			var nodeParentId = [];
+			var nodeLevel = [];
+			var nodeSortOrder = [];
+			var nodeSize = [];  
+			var nodeColor = []; 
+			var nodeColorName = [];
+			var nodeFontColorName = [];
+			var nodeLinkUrl = [];
+			var nodeAdditionalInfo = [];
+			var nodeAdditionalInfoHTML = [];
+			var sequentialChildArray = [];
+			var sequentialParentArray = [];
+			var viewAttributes = [];
+			var tooltip_font_family = "";
+			var tooltip_font_size = 0;
+			var tooltip_color = "";
+			var tooltip_font_color = "";
+			var tooltip_width = 0;
+			
+			if(debugMode!=0)
+				console.log("Executing Main with debugMode="+debugMode);
+			google.load('visualization', '1.1', {'packages':['sankey','wordtree','treemap','orgchart']});
+			google.setOnLoadCallback(drawMyChart);
+			
+		function SOAPClient() {}
+		SOAPClient.invoke = function(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback)
 		{
 			if(debugMode==2) 
 				console.log("SOAPClient.invoke");
 			if(debugMode==2)
 					console.log("SOAPClient.invoke sync will loadWsdl");
-			return SOAPClient._loadWsdl(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback);
+			return SOAPClient._loadWsdl(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback);
 		}
 
 		SOAPClient_cacheWsdl = new Array();
 
-		SOAPClient._loadWsdl = function(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback)
+		SOAPClient._loadWsdl = function(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback)
 		{
 			if(debugMode==2)
 				console.log("SOAPClient._loadWsdl");
@@ -49,10 +100,10 @@ function getCookie(cname) {
 				console.log("SOAPClient._loadWsdl sync xmlHttp Status=" + xmlHttp.status);
 				console.log("SOAPClient._loadWsdl sync xmlHttp Response=" + xmlHttp.responseText);
 			}
-			return SOAPClient._onLoadWsdl(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback, xmlHttp);
+			return SOAPClient._onLoadWsdl(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback, xmlHttp);
 		}
 
-		SOAPClient._onLoadWsdl = function(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback, req)
+		SOAPClient._onLoadWsdl = function(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback, req)
 		{
 			if(debugMode==2)
 				console.log("SOAPClient._onLoadWsdl");
@@ -61,10 +112,10 @@ function getCookie(cname) {
 				console.log("SOAPClient._onloadWsdl will sendSoapRequest");
 
 			SOAPClient_cacheWsdl[url] = wsdl;	/* save a copy in cache */
-			return SOAPClient._sendSoapRequest(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback, wsdl);
+			return SOAPClient._sendSoapRequest(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback, wsdl);
 		}
 
-		SOAPClient._sendSoapRequest = function(debugMode, url, xog_url, method, headparameters, parameters, filter, async, callback, wsdl)
+		SOAPClient._sendSoapRequest = function(url, xog_url, method, headparameters, parameters, filter, sort, sortDir, async, callback, wsdl)
 		{
 			if(debugMode==2)
 				console.log("SOAPClient._sendSoapRequest");
@@ -73,16 +124,30 @@ function getCookie(cname) {
 			var req_envelope='<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">';
 			if(method!="Login")	{
 				var req_header='<soap:Header><Auth>' + headparameters.toXml() + '</Auth></soap:Header>';
-			}
+			} 
 			else {
 				var req_header ="";
 				var req_header_close="";
 			}
-			if(method!="Logout") {
-				if((method!="Login") && (filter.toXml().length>0))
+			var filterTag="";
+			var sortTag="";
+			
+			if((method!="Logout") && (method!="Login")){
+				if (filter.toXml().length>0) {
+					filterTag = '<Filter>' + filter.toXml()+'</Filter>';
+					if(debugMode==2) console.log("filter: " + filterTag);
+				}
+				if (sort.toXml().length>0) {
+					sortTag='<Sort><Column>' + sort.toXml()+ sortDir.toXml()+'</Column></Sort>';
+					/* sortTag='<Sort><Column><Name>nodeSortOrder</Name><Direction>Asc</Direction></Column></Sort>';*/
+					if(debugMode==2) console.log("sort: " + sortTag);
+				}
+				var req_body='<soap:Body><' + method + ' xmlns="' + ns + '">' + parameters.toXml() + filterTag + sortTag + '</' + method + '></soap:Body>';
+				
+/*				if((method!="Login") && (filter.toXml().length>0)
 					var req_body='<soap:Body><' + method + ' xmlns="' + ns + '">' + parameters.toXml() +'<Filter>' + filter.toXml()+'</Filter>'+ '</' + method + '></soap:Body>';
-				else
-					var req_body='<soap:Body><' + method + ' xmlns="' + ns + '">' + parameters.toXml() + '</' + method + '></soap:Body>';
+				else		
+					var req_body='<soap:Body><' + method + ' xmlns="' + ns + '">' + parameters.toXml() + '</' + method + '></soap:Body>';*/
 			}
 			else {
 				var req_body='<soap:Body><Logout/></soap:Body>';
@@ -102,11 +167,11 @@ function getCookie(cname) {
 				console.log("SOAPClient._sendSoapRequest sync xmlHttp Response=" + xmlHttp.responseText);
 			}
 				
-			return SOAPClient._onSendSoapRequest(debugMode, method, async, callback, wsdl, xmlHttp);
+			return SOAPClient._onSendSoapRequest(method, async, callback, wsdl, xmlHttp);
 			
 		}
 
-		SOAPClient._onSendSoapRequest = function(debugMode, method, async, callback, wsdl, req) {
+		SOAPClient._onSendSoapRequest = function(method, async, callback, wsdl, req) {
 			if(debugMode==2)
 				console.log("SOAPClient._onSendSoapRequest");
 			var o = null;
@@ -127,7 +192,7 @@ function getCookie(cname) {
 			else {
 				if(debugMode==2)
 					console.log("SOAPClient._onSendSoapRequest  Method/ND[0]="+method+" "+nd[0]);
-				o=SOAPClient._soapresult2objectv2(debugMode, method, req, nd[0],wsdl);
+				o=SOAPClient._soapresult2objectv2(method, req, nd[0],wsdl);
 			}
 
 			if(callback) {
@@ -150,34 +215,34 @@ function getCookie(cname) {
 			return document.getElementsByTagName(tagName);
 		}
 
-		SOAPClient._soapresult2objectv2 = function(debugMode, method, XMLResponse, node, wsdl) {
+		SOAPClient._soapresult2objectv2 = function(method, XMLResponse, node, wsdl) {
 
 			if(method=='Query') {
 				return XMLResponse;
 			}
 			else {
-				return SOAPClient._soapresult2object(debugMode, node, wsdl);
+				return SOAPClient._soapresult2object(node, wsdl);
 			}
 		}
 
-		SOAPClient._soapresult2object = function(debugMode, node, wsdl) {
-			return SOAPClient._node2object(debugMode, node, wsdl);
+		SOAPClient._soapresult2object = function(node, wsdl) {
+			return SOAPClient._node2object(node, wsdl);
 		}
 
-		SOAPClient._node2object = function(debugMode, node, wsdl) {
+		SOAPClient._node2object = function(node, wsdl) {
 			if(debugMode==2)
 				console.log("SOAPClient._node2object  Node="+node+" Type="+node.nodeType+" ChildNodesLeng="+node.childNodes.length);
 			if(node == null)
 				return null;
 			if(node.nodeType == 3 || node.nodeType == 4) {	
-				return SOAPClient._extractValue(debugMode, node, wsdl);
+				return SOAPClient._extractValue(node, wsdl);
 			}
 			if (node.childNodes.length == 1 && (node.childNodes[0].nodeType == 3 || node.childNodes[0].nodeType == 4)) {
 				if(debugMode==2)
 					console.log("SOAPClient._node2object Leaf="+ node.childNodes[0]);
-				return SOAPClient._node2object(debugMode, node.childNodes[0], wsdl);
+				return SOAPClient._node2object(node.childNodes[0], wsdl);
 			}
-			var isarray = SOAPClient._getTypeFromWsdl(debugMode, node.nodeName, wsdl).toLowerCase().indexOf("arrayof") != -1;
+			var isarray = SOAPClient._getTypeFromWsdl(node.nodeName, wsdl).toLowerCase().indexOf("arrayof") != -1;
 			if(!isarray) {
 				var obj = null;
 				if(node.hasChildNodes())
@@ -191,13 +256,13 @@ function getCookie(cname) {
 			else {
 				var l = new Array();
 				for(var i = 0; i < node.childNodes.length; i++)
-					l[l.length] = SOAPClient._node2object(debugMode, node.childNodes[i], wsdl);
+					l[l.length] = SOAPClient._node2object(node.childNodes[i], wsdl);
 				return l;
 			}
 			return null;
 		}
 
-		SOAPClient._extractValue = function(debugMode, node, wsdl) {
+		SOAPClient._extractValue = function(node, wsdl) {
 			if(debugMode==2) {
 				console.log("SOAPClient._extractValue NodeValue="+node.nodeValue);
 				console.log("SOAPClient._extractValue NodeParent="+node.parentNode.nodeName);
@@ -205,7 +270,7 @@ function getCookie(cname) {
 			}
 			
 			var value = node.nodeValue;
-			switch(SOAPClient._getTypeFromWsdl(debugMode, node.parentNode.nodeName, wsdl).toLowerCase()) {
+			switch(SOAPClient._getTypeFromWsdl(node.parentNode.nodeName, wsdl).toLowerCase()) {
 				default:
 				case "s:string":			
 					return (value != null) ? value + "" : "";
@@ -231,7 +296,7 @@ function getCookie(cname) {
 			}
 		}
 
-		SOAPClient._getTypeFromWsdl = function(debugMode, elementname, wsdl) {
+		SOAPClient._getTypeFromWsdl = function(elementname, wsdl) {
 			if(debugMode==2)
 				console.log("SOAPClient._getTypeFromWsdl ElementName="+elementname);
 			var ell = wsdl.getElementsByTagName("s:element");	/* IE */
@@ -300,7 +365,7 @@ function getCookie(cname) {
 			throw new Error("Could not find an installed XML parser");
 		}
 
-		function ExecuteClarityQueryAsUser(debugMode, ServerName, QueryCode, QueryFilterField, QueryFilterValue, QueryCallback)	{
+		function ExecuteClarityQueryAsUser(ServerName, QueryCode, QueryFilterField, QueryFilterValue, QuerySortField, QuerySortDir, QueryCallback)	{
 			if(debugMode>1) console.log("IN: ExecuteClarityQueryAsUser");
 			var url = "http://" + ServerName + "/niku/wsdl/Query/" + QueryCode;
 			var xog_url = "http://" + ServerName + "/niku/xog";
@@ -318,14 +383,20 @@ function getCookie(cname) {
 			var pheader = new SOAPClientParameters();
 			var pbody = new SOAPClientParameters();
 			var pbodyfilter = new SOAPClientParameters();
+			var pbodysort = new SOAPClientParameters();
+			var pbodysortDir = new SOAPClientParameters();
 			pheader.add("SessionID", UserSessionID);
 			pbody.add("Code", QueryCode);
 			if (QueryFilterField!="")
 				pbodyfilter.add(QueryFilterField, QueryFilterValue);
+			if (QuerySortField!="")
+				pbodysort.add("Name", QuerySortField);
+			if (QuerySortDir!="")
+				pbodysortDir.add("Direction",QuerySortDir);
 			
 			/* Invokes SOAPClient to Run Query with current User's Session */
 			if(debugMode==2) console.log("ExecuteClarityQueryAsUser: SOAPClient.invoke");
-			Result=SOAPClient.invoke(debugMode, url, xog_url, "Query", pheader, pbody, pbodyfilter, false, QueryCallback);
+			Result=SOAPClient.invoke(url, xog_url, "Query", pheader, pbody, pbodyfilter, pbodysort, pbodysortDir, false, QueryCallback);
 
 			if(debugMode==2) console.log("ExecuteClarityQueryAsUser Response="+Result.responseText);
 			if(debugMode>1) console.log("OUT: ExecuteClarityQueryAsUser");
@@ -367,11 +438,17 @@ function getCookie(cname) {
 			return xmlDoc;
 		}
 
-	</script>
-	</head>
-	<body>
-		
-		<script language="javascript">
+		function getCookie(cname) {
+			var name = cname + "=";
+			var ca = document.cookie.split(';');
+			for(var i=0; i<ca.length; i++) {
+				var c = ca[i];
+				while (c.charAt(0)==' ') c = c.substring(1);
+				if (c.indexOf(name) == 0) return c.substring(name.length,c.length);
+			}
+			return "";
+		}
+
 			function eventFire(el, etype){
 				if (el.fireEvent) {
 					el.fireEvent('on' + etype);
@@ -384,9 +461,16 @@ function getCookie(cname) {
 
 			function fetchInternalId() {
 				if(debugMode==1) console.log("IN: fetchInternalId");				
+				/* Fetching View ID 
+				var urlPortlet = window.document.URL;
+				var idViewLocation = urlPortlet.indexOf('&viewID=')+8;
+				var idView = urlPortlet.substring(idViewLocation);
+				if(debugMode==1) console.log("portletURL: "+urlPortlet+" idView: "+idView);*/
+
 				/* Fetching ServerName and Item ID */
 				var vModal=0;
-				var url = window.document.URL;
+				var url = this.parent.document.URL;
+				if(debugMode==1) console.log("fetchInternalId: URL:"+this.parent.document.URL);
 				
 				var vDialogs = document.getElementsByClassName("ppm_dialog");
 				if (vDialogs.length > 0) vModal=1;
@@ -401,10 +485,11 @@ function getCookie(cname) {
 				else
 				{
 					/* Not a Popup */
-					var idLocation = url.indexOf('id=')+3;
+					var idLocation = url.indexOf('\&id=')+4;
 					var end = idLocation + 7;
 					var internalID = url.substring(idLocation, end);
 				}
+				
 				var ServerName = url.substring(7,url.indexOf("niku/")-1);
 				if(debugMode==1) console.log("URL: "+url+" Servername: "+ServerName);
 				if(debugMode==1) console.log("OUT: fetchInternalId");				
@@ -430,6 +515,9 @@ function getCookie(cname) {
 				var xmlobject = crossBrowserXMLLoad(Result.responseText);
 				var items = xmlobject.getElementsByTagName("Record");
 				if(debugMode==3) console.log("loadViewData: #items " + items.length);				
+				
+				if (items.length<1) console.log("ERROR: Bad viewID on Portlet src URL");
+								
 				var item = items[0];
 				
 				viewAttributes[0] = getNodeValue(item.getElementsByTagName("intlid")[0]);
@@ -477,6 +565,13 @@ function getCookie(cname) {
 				} else {
 					viewAttributes[39] = "_parent";
 				}
+				viewAttributes[40] = getNodeValue(item.getElementsByTagName("tooltip_font_family")[0]);
+				viewAttributes[41] = getNodeValue(item.getElementsByTagName("tooltip_font_size")[0]);
+				viewAttributes[42] = getNodeValue(item.getElementsByTagName("tooltip_color")[0]);
+				viewAttributes[43] = getNodeValue(item.getElementsByTagName("tooltip_font_color")[0]);
+				viewAttributes[44] = getNodeValue(item.getElementsByTagName("tooltip_width")[0]);
+				viewAttributes[45] = getNodeValue(item.getElementsByTagName("portlet_width")[0]);
+				viewAttributes[46] = getNodeValue(item.getElementsByTagName("portlet_height")[0]);
 				
 				if(debugMode==3) console.log("loadViewData: id " + viewAttributes[0] + " code " + viewAttributes[1] + " name " + viewAttributes[2] + " query " + viewAttributes[38]);				
 				if(debugMode==3) console.log("OUT: loadViewData");				
@@ -484,7 +579,7 @@ function getCookie(cname) {
 				return viewAttributes[0];
 			}
 
-			function loadNodeData(Result, nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSize, nodeColor, nodeColorName, nodeLinkUrl, nodeAdditionalInfo) {
+			function loadNodeData(Result, nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML) {
 				if(debugMode==4) console.log("IN: loadNodeData");	
 				var xmlobject = crossBrowserXMLLoad(Result.responseText);
 				var items = xmlobject.getElementsByTagName("Record");
@@ -493,25 +588,28 @@ function getCookie(cname) {
 					var item = items[i];
 					nodeId[i] = getNodeValue(item.getElementsByTagName("nodeid")[0]);
 					nodeName[i] = getNodeValue(item.getElementsByTagName("nodename")[0]);
-					nodeParentName[i] = getNodeValue(item.getElementsByTagName("nodeparentid")[0]);
-					nodeParentId[i] = getNodeValue(item.getElementsByTagName("nodeparentname")[0]);
+					nodeParentId[i] = getNodeValue(item.getElementsByTagName("nodeparentid")[0]);
+					nodeParentName[i] = getNodeValue(item.getElementsByTagName("nodeparentname")[0]);
 					nodeLevel[i] = getNodeValue(item.getElementsByTagName("nodelevel")[0]);
-					nodeSizeStr = getNodeValue(item.getElementsByTagName("nodesize")[0]);
-					nodeColorStr = getNodeValue(item.getElementsByTagName("nodecolor")[0]);
+					nodeSortOrder[i] = getNodeValue(item.getElementsByTagName("nodesortorder")[0]);
+					var nodeSizeStr = getNodeValue(item.getElementsByTagName("nodesize")[0]);
+					var nodeColorStr = getNodeValue(item.getElementsByTagName("nodecolor")[0]);
 					nodeColorName[i] = getNodeValue(item.getElementsByTagName("nodecolorname")[0]);
+					nodeFontColorName[i] = getNodeValue(item.getElementsByTagName("nodefontcolorname")[0]);
 					nodeLinkUrl[i] = getNodeValue(item.getElementsByTagName("nodelinkurl")[0]);
 					nodeAdditionalInfo[i] = getNodeValue(item.getElementsByTagName("nodeadditionalinfo")[0]);
+					nodeAdditionalInfoHTML[i] = getNodeValue(item.getElementsByTagName("nodeadditionalinfohtml")[0]);
 					
 					if (typeof nodeName[i] !== 'undefined') {
-						if ( typeof NodeSizeStr !== 'undefined' && typeof NodeColorStr !== 'undefined' ) {
-								nodeSize[i] = Number( NodeSizeStr );
-								nodeColor[i] = Number( NodeColorStr );
+						if ( typeof nodeSizeStr !== 'undefined' && typeof nodeColorStr !== 'undefined' ) {
+								nodeSize[i] = Number( nodeSizeStr );
+								nodeColor[i] = Number( nodeColorStr );
 								if (typeof nodeSize[i] == 'undefined') {
-									if(debugMode==4) console.log("loadNodeData: i " + i + " nodeId " + nodeId[i] + " nodeName " + nodeName[i] + " bad Number in Size " + NodeSizeStr);
+									if(debugMode==4) console.log("loadNodeData: i " + i + " nodeId " + nodeId[i] + " nodeName " + nodeName[i] + " bad Number in Size " + nodeSizeStr);
 									nodeSize[i] = 0.00;	
 								}
 								if (typeof nodeColor[i] == 'undefined') {
-									if(debugMode==4) console.log("loadNodeData: i " + i + " nodeId " + nodeId[i] + " nodeName " + nodeName[i] + " bad Number in Color " + NodeColorStr);
+									if(debugMode==4) console.log("loadNodeData: i " + i + " nodeId " + nodeId[i] + " nodeName " + nodeName[i] + " bad Number in Color " + nodeColorStr);
 									nodeColor[i] = 0;
 								}
 						} else {
@@ -531,27 +629,90 @@ function getCookie(cname) {
 				if(debugMode==4) console.log("OUT: loadNodeData");				
 				return items.length;
 			}
+			
+			function swapArray (anArray, anIndex) {
+				var temp = anArray[anIndex];
+				anArray[anIndex] = anArray[anIndex+1];
+				anArray[anIndex+1] = temp;
+				return anArray;
+			}
+
+			function bubbleSort(nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML)
+			{
+				var swapped;
+				do {
+					swapped = false;
+					for (var i=0; i < nodeSortOrder.length-1; i++) {
+						if (Number(nodeSortOrder[i]) > Number(nodeSortOrder[i+1])) {
+							nodeId = swapArray(nodeId, i);
+							nodeName = swapArray(nodeName, i);
+							nodeParentId = swapArray(nodeParentId, i);
+							nodeParentName = swapArray(nodeParentName, i);
+							nodeLevel = swapArray(nodeLevel, i);
+							nodeSortOrder = swapArray(nodeSortOrder, i);
+							nodeSize = swapArray(nodeSize, i);
+							nodeColor = swapArray(nodeColor, i);
+							nodeColorName = swapArray(nodeColorName, i);
+							nodeFontColorName = swapArray(nodeFontColorName, i);
+							nodeLinkUrl = swapArray(nodeLinkUrl, i);
+							nodeAdditionalInfo = swapArray(nodeAdditionalInfo, i);
+							nodeAdditionalInfoHTML = swapArray(nodeAdditionalInfoHTML, i);
+							swapped = true;
+						}
+					}
+				} while (swapped);
+			}
+ 
+			function showTreeMapTooltip(row, size, value)
+			{
+			
+				var addlInfo = nodeAdditionalInfoHTML[row];
+				var itemLink = nodeLinkUrl[row];
+				var tooltipNode = nodeName[row];
+				
+				return '<div style="width:' + tooltip_width + '; background-color:' + tooltip_color + '; position: absolute; z-index: 100; padding:10px; border-style:none;">' +
+						'<span style="font-family:' + tooltip_font_family + '; font-size:'+ tooltip_font_size + 'px; color:' + tooltip_font_color + '">' + addlInfo +
+						'<br>' + '<a target="' + drillPage + '" href="' + itemLink + '">' + tooltipNode + '</a><br></span></div>';
+			}
+
+			function addSequentialId(childId, parentId)
+			{
+				var idFound = false;
+				for (var x=0; x<sequentialChildArray.length; x++) {
+					if ((sequentialChildArray[x] == childId) 
+						&& (sequentialParentArray[x] == parentId)) {
+						if (debugMode > 2) console.log("Node " + childId + " for parent " + parentId + " found at position " + x + ". Not ADDED");
+						idFound = true;
+					}
+				}
+				if (idFound == false) {
+					if (debugMode > 2) console.log("Node " + childId + " for parent " + parentId + " not found. Adding at position " + x);
+					sequentialChildArray.push([childId]);
+					sequentialParentArray.push([parentId]);
+				}
+			}
+
+			function findId(childId, parentId)
+            		{
+				for (var x = 0; x<sequentialChildArray.length; x++)
+		                {
+					if (((sequentialChildArray[x] == childId) && (sequentialParentArray[x] == parentId)) ||
+					    ((sequentialChildArray[x] == childId) && (parentId == -1)))
+                    			{
+						return x;
+                    			}
+                		}
+                		return -1;
+			}
 
 			function drawMyChart() {
 
 			if(debugMode==1) console.log("IN: drawMyChart");
-				google.load('visualization', '1.1', {'packages':['sankey','wordtree','treemap','orgchart']});
-				var vDrillTarget = "";
+				
 				var Server=fetchInternalId();
 				var internalID=Server[0];
 				var ServerName=Server[1];
 				if(debugMode==1) console.log("drawMyChart: ServerName: "+ServerName);
-				var nodeName = [];
-				var nodeId = [];
-				var nodeParentName = [];
-				var nodeParentId = [];
-				var nodeLevel = [];
-				var nodeSize = [];  
-				var nodeColor = []; 
-				var nodeColorName = [];
-				var nodeLinkUrl = [];
-				var nodeAdditionalInfo = [];
-				var viewAttributes = [];
 				var Result;
 				var viewId;
 				var totalitems;
@@ -559,6 +720,9 @@ function getCookie(cname) {
 				var QueryFilterValue;
 				var QueryCallback;
 				var QueryCode;
+				var QuerySortField='';
+				var QuerySortDir='';
+
 				var itemNameLong="";
 				var linkClass="";
 
@@ -571,7 +735,7 @@ function getCookie(cname) {
 				QueryCallback="";
 				QueryCode="hiev_list_wsdl";
 				if(debugMode==3) console.log("drawMyChart: View List --Server Name: "+ServerName+"--Query Code: "+QueryCode+"--Filter Field: "+QueryFilterField+"--Filter Value: "+QueryFilterValue+"--Call Back: "+QueryCallback);
-				Result=ExecuteClarityQueryAsUser(debugMode, ServerName, QueryCode, QueryFilterField, QueryFilterValue, QueryCallback);
+				Result=ExecuteClarityQueryAsUser(ServerName, QueryCode, QueryFilterField, QueryFilterValue, QuerySortField, QuerySortDir, QueryCallback);
 				
 				if(debugMode==3) console.log("drawMyChart: Back from View List:"+Result.responseText);
 				viewId=loadViewData(Result, viewAttributes);
@@ -616,7 +780,14 @@ function getCookie(cname) {
 				var node_color = viewAttributes[36]; 
 				var hier_type = viewAttributes[37]; 
 				var studio_query_id = viewAttributes[38];
-				var drillPage = viewAttributes[39]; 
+				drillPage = viewAttributes[39]; 
+				tooltip_font_family = viewAttributes[40];
+				tooltip_font_size = viewAttributes[41];
+				tooltip_color = viewAttributes[42];
+				tooltip_font_color = viewAttributes[43];
+				tooltip_width = viewAttributes[44];
+				var portlet_width = viewAttributes[45];
+				var portlet_height = viewAttributes[46];
 
 				if(debugMode==3) console.log("drawMyChart: Reading Attributes hier_type "+hier_type + " and drill page "+drillPage);
 				
@@ -624,20 +795,23 @@ function getCookie(cname) {
 					use this statement to test running the query as admin (remember to set the password accordingly)
 					var Result=ExecuteClarityQueryAsAdmin(debugMode, ServerName, QueryCode, QueryFilterField, QueryFilterValue, "admin", "iluvca", QueryCallback);
 				*/
-				QueryFilterField = "param_internal_id";
+				QueryFilterField = "param_intlid";
 				QueryFilterValue = internalID;
 				QueryCallback="";
-				QueryCode="strat_hiev_item_hm";
+				QueryCode=studio_query_id;
+				QuerySortField='nodeSortOrder';
+				QuerySortDir='Asc';
 				if(debugMode==4) console.log("drawMyChart: Node List --Server Name: "+ServerName+"--Query Code: "+QueryCode+"--Filter Field: "+QueryFilterField+"--Filter Value: "+QueryFilterValue+"--Call Back: "+QueryCallback);
-				Result=ExecuteClarityQueryAsUser(debugMode, ServerName, QueryCode, QueryFilterField, QueryFilterValue, QueryCallback);
+				Result=ExecuteClarityQueryAsUser(ServerName, QueryCode, QueryFilterField, QueryFilterValue, QuerySortField, QuerySortDir, QueryCallback);
 				
 				if(debugMode==4) console.log("drawMyChart: Back from Node List:"+Result.responseText);
-				totalitems=loadNodeData(Result, nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSize, nodeColor, nodeColorName, nodeLinkUrl, nodeAdditionalInfo);
+				totalitems=loadNodeData(Result, nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML);
 				if(debugMode==4) console.log("drawMyChart: Back from Node Data: "+totalitems + " node0 " + nodeId[0] + " lastNode " + nodeId[totalitems-1]);
 				
 				switch (hier_type) {
 					case "TreeMap":
 						if (debugMode > 1) console.log("Creating Tree Map DataTable");
+						/*bubbleSort(nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML);*/
 						var data = new google.visualization.DataTable();
 						if (debugMode > 1) console.log("Creating Tree Map DataTable2");
 						data.addColumn('string', 'nodeName');
@@ -645,17 +819,18 @@ function getCookie(cname) {
 						data.addColumn('number', 'nodeSize');
 						data.addColumn('number', 'nodeColor');
 
-						for (var i = 0 ; i < totalitems ; i++) {
+						if (totalitems > 0)	data.addRow([nodeName[0], '', nodeSize[0], nodeColor[0]]);
+						for (var i = 1 ; i < totalitems ; i++) {
 							data.addRow([nodeName[i], nodeParentName[i], nodeSize[i], nodeColor[i]]);
 						}
 					
-						if (debugLevel > 1) console.log("dataTable is Ready");
+						if (debugMode > 1) console.log("dataTable is Ready");
 					
 						tree = new google.visualization.TreeMap(document.getElementById('map_canvas'));
-						if (debugLevel > 1) console.log("drawTreeHeatMap");
+						if (debugMode > 1) console.log("drawTreeHeatMap");
 						tree.draw(data, 
 						{
-							height: 570,
+							width: portlet_width, height: portlet_height,
 							maxDepth: max_depth,
 							fontFamily: font_family,
 							fontSize: font_size,
@@ -675,8 +850,8 @@ function getCookie(cname) {
 							midHighlightColor: mid_high_color,
 							maxHighlightColor: max_high_color,
 							noHighlightColor: no_high_color,
-							minColorValue: min_colorValue,
-							maxColorValue: max_colorValue,
+							minColorValue: min_color_value,
+							maxColorValue: max_color_value,
 							generateTooltip: showTreeMapTooltip,
 							title: name,
 							titleTextStyle: 
@@ -688,18 +863,145 @@ function getCookie(cname) {
 											italic: false
 										}
 						});
+
 						break;
 					case "WordTre":
-						if (debugMode > 1) console.log("Create WordTree DataTable");
+						if (debugMode > 1) console.log("Creating WordTree DataTable");
+						/*bubbleSort(nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML);*/
+						
 						var data = new google.visualization.DataTable();
+						data.addColumn('number', 'id');
+						data.addColumn('string', 'childLabel');
+						data.addColumn('number', 'parent');
+						data.addColumn('number', 'weight');
+						data.addColumn('string', 'color');
+
+						var childId = -1;
+						var childLabel = "";
+						var sizeWord = 0;
+						var colorWord = "";
+						var parent = -1;
+						if (debugMode > 2) console.log("Creating Sequential ID Array");
+						
+						for (ind = 0; ind < totalitems; ind++){
+							if (debugMode > 2) console.log("Index: " + ind + " is Node " + nodeId[ind]);
+							addSequentialId(nodeId[ind], nodeParentId[ind]);
+						}
+
+						for (ind = 0; ind < totalitems; ind++)
+						{
+							childId = findId(nodeId[ind], nodeParentId[ind]);
+							if (debugMode > 2) console.log("Index: "+ ind + " - Child " + nodeId[ind] + " found Id " + childId);
+
+							if (ind==0)
+							{
+								parent = -1;
+							}
+							else
+							{
+								parent = findId(nodeParentId[ind],-1);
+							}
+							if (debugMode > 3) console.log("Parent " + nodeParentId[ind] + " has Id " + parent);
+							if (debugMode > 2) console.log("Will Add Row to Data Array: " + childId + ", " + nodeName[ind] + ", " + parent + ", " + nodeColorName[ind]);
+							data.addRow([childId, nodeName[ind], parent, 1, nodeColorName[ind]]);
+						}
+			
+						if (debugMode > 1) console.log("dataTable is Ready");
+
+						tree = new google.visualization.WordTree(document.getElementById('map_canvas'));
+						if (debugMode > 1) console.log("drawWordTree "+font_family+font_size);
+						
+						tree.draw(data, 
+						{ 
+							width: portlet_width, height: portlet_height,
+							maxFontSize: font_size, 
+							fontName: font_family, 
+							wordtree: 
+							{ 
+								format: 'explicit', 
+								type: word_tree_type
+							}
+						});
+						
 						break;
 					case "OrgChar":
 						if (debugMode > 1) console.log("Creating Org Chart DataTable");
+						/* bubbleSort(nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML);*/
 						var data = new google.visualization.DataTable();
+						if (debugMode > 1) console.log("Creating Org Chart DataTable2");
+						data.addColumn('string', 'nodeName');
+						data.addColumn('string', 'nodeParent');
+						data.addColumn('string', 'nodeTooltip');
+						
+						nodeParentName[0]="";
+						for (var i = 0 ; i < totalitems ; i++) {
+							itemNameLong = '<div style="background-color: ';
+							itemNameLong += nodeColorName[i];
+							itemNameLong += '; padding:10px; font-family:' + font_family;
+							itemNameLong += '; font-size:' + font_size;
+							itemNameLong += '"><a class="orgChartLink" style="color:'+ nodeFontColorName[i];
+							itemNameLong += '" target="' + drillPage + '" href="' + nodeLinkUrl[i] + '">' + nodeName[i] + '</a></div>';
+							
+							linkInfo = '<b><a target="' + drillPage + '" href="' + nodeLinkUrl[i] + '">' + nodeName[i] + '</a></b>';
+							data.addRow([{v:nodeName[i], f:itemNameLong}, nodeParentName[i], nodeAdditionalInfo[i]]);
+						}
+
+						if (debugMode > 1) console.log("dataTable is Ready");
+
+						tree = new google.visualization.OrgChart(document.getElementById('map_canvas'));
+						if (debugMode > 1) console.log("drawOrgChart");
+
+						tree.draw(data, {allowHtml:true, allowCollapse:true, size:chart_node_size});
 						break;
 					case "SankeyD":
 						if (debugMode > 1) console.log("Create Sankey Diagram DataTable");
+						/* bubbleSort(nodeId, nodeName, nodeParentId, nodeParentName, nodeLevel, nodeSortOrder, nodeSize, nodeColor, nodeColorName, nodeFontColorName, nodeLinkUrl, nodeAdditionalInfo, nodeAdditionalInfoHTML);*/
+						
 						var data = new google.visualization.DataTable();
+						if (debugMode > 1) console.log("Creating Sankey Diagram DataTable2");
+						data.addColumn('string', 'from');
+						data.addColumn('string', 'to');
+						data.addColumn('number', 'weight');
+						
+						for (i = 1; i < totalitems; i++)
+						{
+							childLabel = nodeName[i];
+							parentLabel = nodeParentName[i];
+							sizeNumber = nodeSize[i];
+							if (debugMode > 1) console.log("Item: "+ i + " - " + parentLabel + " " + childLabel + " " + sizeNumber);
+							data.addRow([parentLabel, childLabel, sizeNumber]);
+						}
+						if (debugMode > 1) console.log("dataTable is Ready");
+
+						tree = new google.visualization.Sankey(document.getElementById('map_canvas'));
+						if (debugMode > 1) console.log("drawDiagram");
+
+						tree.draw(data, {
+										width: portlet_width, height: portlet_height,
+										sankey: { 
+											node: { 
+												interactivity: true,
+												label: { fontName: font_family,
+													fontSize: font_size,
+													color: font_color
+													}, 
+												labelPadding: label_padding,
+												nodePadding: node_padding,
+												width: node_width
+											},
+											iterations: sankey_iterations,
+											link: {
+												colorMode: 'gradient',
+												color:	{
+													fill: link_fill_color,
+													fillOpacity: link_fill_opacity,
+													stroke: link_stroke_color,
+													strokeWidth: link_stroke_width
+												}
+											}
+										}
+									});
+
 						break;
 				}
 					
@@ -707,23 +1009,13 @@ function getCookie(cname) {
 				
 				return true;
 			}
-		</script>
-		<script language="javascript">
-			
-			/* 	debugMode=1 -> Init
-				debugMode=2 -> SoapClient
-				debugMode=3 -> View Query
-				debugMode=4 -> Node Query
-				debugMode=5 -> L3 Query Result 
-				debugMode=6 -> DD Query Result */
-
-			var debugMode=3;
-			var viewCode="hiev_strat_item_hm";
-			drawMyChart();
-		</script>
-		<div style="position:absolute; top:10px; right:10px">
+		
+	</script>
+	</head>
+	<body>
+		<div id="printerImg" style="position:absolute; top:10px; right:10px">
 			<a href="JavaScript:print()">
-				<img id="print" src="data:image/png;base64,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" alt="Print" width="20" height="20" align="right">
+				<img id="print" src="data:image/png;base64,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" alt="Print">
 			</a>
 		</div>
 		<div id="map_canvas" style="position:absolute; top:10px; right:10px width:96%; height:97%"/>				
